@@ -1,3 +1,8 @@
+-- Get services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
 -- Create settings table
 local set = {
 	AutoAimBat = false, -- Offsets the bat, makes you miss hits though
@@ -8,22 +13,20 @@ local set = {
 	YOffset = -12, --Offsets your mouse Y coordinate by this amount (for improved hitting, i.e. getting under the ball)
 	OnlyHitInBox = true, --Only swing at strikes
 	AimWithMouse = true, --Honestly not sure what this does
-	showBoundsAndPrediction = true, --Show ball prediction
+	showBoundsAndPrediction = false, --Show ball prediction
 	showStrikezone = false, --Whether or not you want the strike zone to be shown at all times
+	tweenSpeed = 1, --Affects steady bonus
 }
 
-local function find_constant(func, sig)
-	local s = "9271YE7DGWDAHSDBSSS"
-	for i, v in ipairs(getconstants(func)) do
-		if tostring(v):find(sig) then
-			return true
-		end
-	end
-	return false
-end
+-- Get player related variables
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
 
+-- Get game related variables
 local theBall = nil
-local tweenSpeed = 0
+local currentPathTable = {}
+local predictedPos = Vector3.new()
+local lastTick = 0
 
 local Circle = Drawing.new("Circle")
 Circle.Visible = true
@@ -36,6 +39,7 @@ PredictionCircle.Visible = true
 PredictionCircle.Thickness = 2
 PredictionCircle.Radius = 30
 PredictionCircle.Color = Color3.new(255, 0, 0)
+
 local InsidePredictionCircle = Drawing.new("Circle")
 InsidePredictionCircle.Visible = true
 InsidePredictionCircle.Thickness = 2
@@ -44,21 +48,25 @@ InsidePredictionCircle.Transparency = 0.5
 InsidePredictionCircle.Radius = 30
 InsidePredictionCircle.Color = Color3.new(255, 0, 0)
 
-local part = _G.Part or Instance.new("Part")
-_G.Part = part
-part.Anchored = true
-part.Size = Vector3.new(0.5, 0.5, 0.5)
-part.BrickColor = BrickColor.new("Really red")
-part.CanCollide = false
-part.Transparency = set.showBoundsAndPrediction and 0.35 or 1
+local predictionPart = Instance.new("Part")
+predictionPart.Anchored = true
+predictionPart.Size = Vector3.new(0.5, 0.5, 0.5)
+predictionPart.BrickColor = BrickColor.new("Really red")
+predictionPart.CanCollide = false
+predictionPart.Transparency = set.showBoundsAndPrediction and 0.35 or 1
 if set.showStrikezone then
-	part.Parent = workspace
+	predictionPart.Parent = workspace
 end
 
-local currentPathTable = {}
-local predictedPos = Vector3.new()
-
-local lastTick = 0
+local function find_constant(func, sig)
+	local s = "9271YE7DGWDAHSDBSSS"
+	for i, v in ipairs(getconstants(func)) do
+		if tostring(v):find(sig) then
+			return true
+		end
+	end
+	return false
+end
 
 local old
 old = hookmetamethod(game, "__namecall", function(self, ...)
@@ -128,12 +136,10 @@ for i, v in ipairs(getgc(true)) do
 	end
 end
 
-game.ReplicatedStorage.RESC.SEVREPBALLTHROW.OnClientEvent:connect(function(_, p219)
+ReplicatedStorage.RESC.SEVREPBALLTHROW.OnClientEvent:connect(function(_, p219)
 	currentPathTable = p219
 end)
 
-local mouse = game:GetService("Players").LocalPlayer:GetMouse()
-local RunService = game:GetService("RunService")
 local toChange = nil
 local hasWindedUp = false
 local hasSwang = false
@@ -149,7 +155,7 @@ function actuallyAim()
 			toAimAt = predictedPos
 		end
 		local ballPos = camera:WorldToScreenPoint(toAimAt + Vector3.new(0, -theBall.Size.Y / 2, 0))
-		local mousePos = camera:WorldToScreenPoint(mouse.Hit.p)
+		local mousePos = camera:WorldToScreenPoint(Mouse.Hit.p)
 		local aimAt = Vector2.new()
 		local normalPos = Vector2.new(ballPos.X, ballPos.Y)
 		if toChange then
@@ -171,6 +177,9 @@ function actuallyAim()
 			local ballMag = (theBall.Position - toMag).Magnitude
 			if ballMag <= set.WindupDist and not hasWindedUp then
 				hasWindedUp = true
+				task.delay(2, function()
+					hasWindedUp = false
+				end)
 				mouse1click()
 			end
 			if hasWindedUp and not hasSwang then
@@ -195,39 +204,37 @@ function actuallyAim()
 					),
 				}
 
-				local parts = _G.parts
-					or {
-						TopLeft = Instance.new("Part"),
-						TopRight = Instance.new("Part"),
-						BottomLeft = Instance.new("Part"),
-						BottomRight = Instance.new("Part"),
-					}
-				_G.parts = parts
+				local strikezoneParts = {
+					TopLeft = Instance.new("Part"),
+					TopRight = Instance.new("Part"),
+					BottomLeft = Instance.new("Part"),
+					BottomRight = Instance.new("Part"),
+				}
 
-				for i, v in pairs(parts) do
+				for i, v in pairs(strikezoneParts) do
 					v.Anchored = true
 					v.CanCollide = false
 					v.BrickColor = BrickColor.new("Cyan")
 					v.Size = Vector3.new(0.25, 0.25, 0.25)
 					v.Transparency = set.showBoundsAndPrediction and 0.1 or 1
 					if set.showStrikezone then
-                        v.Parent = workspace
-                    end
+						v.Parent = workspace
+					end
 				end
 
 				if set.showBoundsAndPrediction then
-					_G.Part.Transparency = 0.35
+					predictionPart.Transparency = 0.35
 				else
-					_G.Part.Transparency = 1
+					predictionPart.Transparency = 1
 				end
 
-				parts.TopLeft.Position = borderBox.Position
+				strikezoneParts.TopLeft.Position = borderBox.Position
 					+ Vector3.new(0, borderBox.Size.Y / 2 + 0.2 + 0.25, borderBox.Size.X / 2 + 0.2 + 0.25)
-				parts.TopRight.Position = borderBox.Position
+				strikezoneParts.TopRight.Position = borderBox.Position
 					+ Vector3.new(0, borderBox.Size.Y / 2 + 0.2 + 0.25, -borderBox.Size.X / 2 - 0.2 - 0.25)
-				parts.BottomRight.Position = borderBox.Position
+				strikezoneParts.BottomRight.Position = borderBox.Position
 					+ Vector3.new(0, -borderBox.Size.Y / 2 - 0.2, -borderBox.Size.X / 2 - 0.2 - 0.25)
-				parts.BottomLeft.Position = borderBox.Position
+				strikezoneParts.BottomLeft.Position = borderBox.Position
 					+ Vector3.new(0, -borderBox.Size.Y / 2 - 0.2, borderBox.Size.X / 2 + 0.2 + 0.25)
 
 				--TopLeft
@@ -249,7 +256,6 @@ function actuallyAim()
 
 						task.delay(2, function()
 							hasSwang = false
-							hasWindedUp = false
 							theBall = nil
 						end)
 					end
@@ -262,10 +268,10 @@ function actuallyAim()
 			local CFValue = Instance.new("CFrameValue")
 			CFValue.Value = CFrame.new(mousePos.X, mousePos.Y, 0)
 			local con = true
-			if tweenSpeed ~= 0 then
+			if set.tweenSpeed ~= 0 then
 				tween = game:GetService("TweenService"):Create(
 					CFValue,
-					TweenInfo.new(tweenSpeed, Enum.EasingStyle.Quad),
+					TweenInfo.new(set.tweenSpeed, Enum.EasingStyle.Quad),
 					{ Value = CFrame.new(aimAt.X, aimAt.Y, 0) }
 				)
 				tween:Play()
@@ -284,11 +290,10 @@ function actuallyAim()
 						if predictedPos and predictedPos ~= Vector3.new() then
 							toAimAt = predictedPos
 						end
-						local ballPos = camera:WorldToScreenPoint(toAimAt + Vector3.new(0, -theBall.Size.Y / 2, 0))
-						local mousePos = camera:WorldToScreenPoint(mouse.Hit.p)
-						local aimAt = Vector2.new()
-						local normalPos = Vector2.new(ballPos.X, ballPos.Y)
-						local diff
+						ballPos = camera:WorldToScreenPoint(toAimAt + Vector3.new(0, -theBall.Size.Y / 2, 0))
+						mousePos = camera:WorldToScreenPoint(Mouse.Hit.p)
+						aimAt = Vector2.new()
+						normalPos = Vector2.new(ballPos.X, ballPos.Y)
 						if toChange then
 							local cursorV2 =
 								camera:WorldToScreenPoint(toChange.Position + Vector3.new(0, toChange.Size.Y / 2, 0))
@@ -297,13 +302,12 @@ function actuallyAim()
 
 							local difference = (myMousePos - cursorPos)
 							normalPos = normalPos + difference + Vector2.new(0, set.YOffset)
-							diff = difference
 						end
 						aimAt = normalPos
 
 						tween = game:GetService("TweenService"):Create(
 							CFValue,
-							TweenInfo.new(tweenSpeed, Enum.EasingStyle.Quad),
+							TweenInfo.new(set.tweenSpeed, Enum.EasingStyle.Quad),
 							{ Value = CFrame.new(aimAt.X, aimAt.Y, 0) }
 						)
 						tween:Play()
