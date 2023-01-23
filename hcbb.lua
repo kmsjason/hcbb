@@ -133,7 +133,7 @@ game.ReplicatedStorage.RESC.SEVREPBALLTHROW.OnClientEvent:connect(function(_, p2
 end)
 
 local mouse = game:GetService("Players").LocalPlayer:GetMouse()
-local smoothness = 1
+local RunService = game:GetService("RunService")
 local toChange = nil
 local hasWindedUp = false
 local hasSwang = false
@@ -152,7 +152,6 @@ function actuallyAim()
 		local mousePos = camera:WorldToScreenPoint(mouse.Hit.p)
 		local aimAt = Vector2.new()
 		local normalPos = Vector2.new(ballPos.X, ballPos.Y)
-		local diff
 		if toChange then
 			local cursorV2 = camera:WorldToScreenPoint(toChange.Position + Vector3.new(0, toChange.Size.Y / 2, 0))
 			local myMousePos = Vector2.new(mousePos.X, mousePos.Y)
@@ -160,7 +159,6 @@ function actuallyAim()
 
 			local difference = (myMousePos - cursorPos)
 			normalPos = normalPos + difference + Vector2.new(0, set.YOffset)
-			diff = difference
 		end
 		aimAt = normalPos
 
@@ -212,7 +210,9 @@ function actuallyAim()
 					v.BrickColor = BrickColor.new("Cyan")
 					v.Size = Vector3.new(0.25, 0.25, 0.25)
 					v.Transparency = set.showBoundsAndPrediction and 0.1 or 1
-					--v.Parent = workspace
+					if set.showStrikezone then
+                        v.Parent = workspace
+                    end
 				end
 
 				if set.showBoundsAndPrediction then
@@ -371,12 +371,14 @@ local function setToChange(self)
 		end)
 	end
 end
+
 for i, v in ipairs(workspace.Ignore:GetChildren()) do
 	setToChange(v)
 end
+
 workspace.Ignore.ChildAdded:Connect(setToChange)
 
-game:GetService("RunService").Heartbeat:connect(function()
+RunService.Heartbeat:connect(function()
 	if theBall == nil or theBall.Parent == nil then
 		Circle.Visible = false
 	else
