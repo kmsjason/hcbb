@@ -15,7 +15,7 @@ local set = {
 	AimWithMouse = true, --Honestly not sure what this does
 	showBoundsAndPrediction = false, --Show ball prediction
 	showStrikezone = false, --Whether or not you want the strike zone to be shown at all times
-	tweenSpeed = .25, --Affects steady bonus
+	tweenSpeed = .05, --Affects steady bonus
 }
 
 -- Get player related variables
@@ -26,7 +26,6 @@ local Mouse = LocalPlayer:GetMouse()
 local theBall = nil
 local currentPathTable = {}
 local predictedPos = Vector3.new()
-local lastTick = 0
 
 local Circle = Drawing.new("Circle")
 Circle.Visible = true
@@ -68,7 +67,9 @@ local function find_constant(func, sig)
 	return false
 end
 
+local lastTick = 0
 local old
+
 old = hookmetamethod(game, "__namecall", function(self, ...)
 	if not checkcaller() and getnamecallmethod() == "Clone" and self and self.Parent and self.Parent.Name == "Ball" then
 		if tick() > lastTick + 2 then
