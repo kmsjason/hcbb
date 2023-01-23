@@ -15,7 +15,7 @@ local set = {
 	AimWithMouse = true, --Honestly not sure what this does
 	showBoundsAndPrediction = false, --Show ball prediction
 	showStrikezone = false, --Whether or not you want the strike zone to be shown at all times
-	tweenSpeed = .05, --Affects steady bonus
+	tweenSpeed = 0, --Affects steady bonus
 }
 
 -- Get player related variables
